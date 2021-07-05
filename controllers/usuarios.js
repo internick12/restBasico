@@ -1,43 +1,75 @@
 const { response, request } = require('express');
+const Usuario = require('../models/usuario');
+const bcrypt = require('bcryptjs');
 
-const usuariosGet = (req = request, res = response) => {
 
-    const query = req.query;
+
+const usuariosGet = async(req = request, res = response) => {
+
+    const{ limite=5, desde = 0 } = req.query;
+    const query = { estado: true }
+    
+    //const usuarios = await Usuario.find(query).skip(Number(desde)).limit( Number(limite) );
+    //const total = await Usuario.countDocuments( query );
+
+    const [total, usuarios] = await Promise.all([
+        Usuario.countDocuments( query ),
+        Usuario.find(query).skip(Number(desde)).limit( Number(limite) )
+    ]);
 
     res.json({
-        ok: true,
-        msg: 'Peticion get al api --  controlador ',
-        query
+        total, usuarios
+        //total,
+        //usuarios
     });
 }
 
-const usuariosPut = (req, res = response) => {
+const usuariosPut = async(req, res = response) => {
 
     const { id } = req.params;
+    const { _id, password, google, correo, ...resto } = req.body;
 
-    res.json({
-        ok: true,
-        msg: 'Peticion put al api -- desde el controlador ',
-        id
-    });
+    //TODO: validar contra db
+    if( password ){
+        //Encriptar password
+        const salt = bcrypt.genSaltSync();
+        resto.password = bcrypt.hashSync( password, salt );
+    }
+
+    const usuario = await Usuario.findByIdAndUpdate( id, resto );
+
+    res.json( Usuario );
 }
 
-const usuariosPost = (req, res = response) => {
+const usuariosPost = async(req, res = response) => {
 
-    const { nombre, edad } = req.body;
+    const { nombre, correo, password, role } = req.body;
+    const usuario = new Usuario({ nombre, correo, password, role });
+   
+
+    //Encriptar password
+    const salt = bcrypt.genSaltSync();
+    usuario.password = bcrypt.hashSync( password, salt );
+
+    //Guardar en bd
+
+    await usuario.save();
 
     res.json({
         ok: true,
         msg: 'Peticion post al api -- desde el controlador ',
-        nombre, edad
+        usuario
     });
 }
 
-const usuariosDelete = (req, res = response) => {
-    res.json({
-        ok: true,
-        msg: 'Peticion delete al api -- desde el controlador '
-    });
+const usuariosDelete = async (req, res = response) => {
+
+    const{ id } = req.params;
+
+    //const usuario = await Usuario.findByIdAndDelete( id );
+    const usuario = await Usuario.findByIdAndUpdate( id, { estado: false} );
+
+    res.json(usuario);
 }
 
 module.exports = { usuariosGet, usuariosPut, usuariosPost, usuariosDelete };
